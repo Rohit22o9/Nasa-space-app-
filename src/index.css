@@ -4,64 +4,61 @@
 
 @layer base {
   body {
-    background-color: #030712;
-    color: #f1f5f9;
-    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #070B19;
+    color: #f8fafc;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
 
-/* Custom NASA Mission Control Grid & HUD styling */
-.hud-grid {
-  background-image: 
-    linear-gradient(to right, rgba(0, 229, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-
-.radar-sweep {
-  background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 229, 255, 0.15) 60deg, transparent 61deg);
-}
-
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #070d1d;
-}
-::-webkit-scrollbar-thumb {
-  background: #1b2d56;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #00e5ff;
-}
-
-/* Glassmorphism panel */
-.glass-panel {
-  background: rgba(11, 20, 42, 0.75);
+/* Crisp NASA Aesthetic */
+.nasa-card {
+  background: rgba(14, 23, 47, 0.85);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(0, 229, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease-in-out;
 }
 
-.glass-panel-subtle {
-  background: rgba(7, 13, 29, 0.6);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.nasa-card:hover {
+  border-color: rgba(0, 229, 255, 0.4);
 }
 
-.glow-border-cyan {
+.nasa-card-active {
+  background: rgba(11, 30, 70, 0.9);
   border-color: #00e5ff;
-  box-shadow: 0 0 15px rgba(0, 229, 255, 0.25);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
 }
 
-.glow-border-gold {
-  border-color: #f59e0b;
-  box-shadow: 0 0 15px rgba(245, 158, 11, 0.25);
+/* Subtle grid */
+.nasa-grid {
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
-.glow-border-red {
-  border-color: #fc3d21;
-  box-shadow: 0 0 15px rgba(252, 61, 33, 0.25);
+/* Clean buttons */
+.btn-nasa-primary {
+  background: linear-gradient(135deg, #0B3D91 0%, #1e40af 100%);
+  color: #ffffff;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 4px 14px rgba(11, 61, 145, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-nasa-primary:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  box-shadow: 0 6px 20px rgba(0, 229, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-nasa-accent {
+  background: linear-gradient(135deg, #FC3D21 0%, #ef4444 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(252, 61, 33, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-nasa-accent:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  transform: translateY(-1px);
 }
