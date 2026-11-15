@@ -157,7 +157,10 @@ export function App() {
         {currentStep === 1 && (
           <div className="space-y-4">
             {/* 3D Deep Space Scroll Zoom Entrance */}
-            <CosmicScrollHero onEnterLab={handleScrollToCards} />
+            <CosmicScrollHero 
+              onEnterLab={handleScrollToCards} 
+              onOpenGuide={() => setIsTutorialOpen(true)} 
+            />
 
             {/* Mission Cards Docking Target */}
             <div ref={missionCardsRef} className="max-w-6xl mx-auto px-4 md:px-6 pt-12 pb-20">
