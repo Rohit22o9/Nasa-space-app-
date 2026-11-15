@@ -8,7 +8,7 @@ import {
   NASA_PROPULSION,
   NASA_INSTRUMENTS 
 } from '../data/nasaData';
-import { Layers, RotateCcw, Crosshair } from 'lucide-react';
+import { Layers, RotateCcw, Sparkles } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 
 interface Props {
@@ -27,9 +27,8 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
 
   const isDraggingRef = useRef(false);
   const prevMousePosRef = useRef({ x: 0, y: 0 });
-  const rotationTargetRef = useRef({ x: 0.35, y: 0.6 });
+  const rotationTargetRef = useRef({ x: 0.25, y: 0.5 });
 
-  // Initialize Three.js scene
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -39,8 +38,10 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 1.8, 4.4);
+    // Centered camera for optimal spacecraft framing
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, 0.8, 4.8);
+    camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -48,55 +49,41 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     rendererRef.current = renderer;
-
     containerRef.current.appendChild(renderer.domElement);
 
-    // 1. LIGHTING
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
+    // Warm Key Light & Cyan Rim Lighting (Hangar sci-fi look)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfff7e6, 2.5);
-    sunLight.position.set(6, 8, 7);
-    sunLight.castShadow = true;
-    scene.add(sunLight);
+    const keySun = new THREE.DirectionalLight(0xfff5e6, 2.5);
+    keySun.position.set(6, 6, 7);
+    scene.add(keySun);
 
-    const bayCyanRim = new THREE.DirectionalLight(0x00e5ff, 0.7);
-    bayCyanRim.position.set(-6, -2, -4);
-    scene.add(bayCyanRim);
+    const rimCyan = new THREE.DirectionalLight(0x00e5ff, 0.9);
+    rimCyan.position.set(-6, -2, -5);
+    scene.add(rimCyan);
 
-    // 2. ORBITAL SHIPYARD HOLOGRAPHIC DRYDOCK PLATFORM
-    const gridHelper = new THREE.GridHelper(5, 12, 0x00e5ff, 0x1e3a8a);
-    gridHelper.position.y = -1.35;
-    scene.add(gridHelper);
-
-    // Glowing Holographic Base Ring
-    const ringGeo = new THREE.RingGeometry(1.4, 1.45, 48);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, side: THREE.DoubleSide });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = -1.34;
-    scene.add(ring);
-
-    // Spacecraft root group
+    // Spacecraft root group - centered at origin
     const scGroup = new THREE.Group();
+    scGroup.position.set(0, 0, 0);
     scene.add(scGroup);
     spacecraftGroupRef.current = scGroup;
 
-    // Stars & Floating Nanodust particles
+    // Subtle background stars
     const starGeo = new THREE.BufferGeometry();
     const starCount = 300;
-    const starPositions = new Float32Array(starCount * 3);
+    const starPos = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount * 3; i += 3) {
-      starPositions[i] = (Math.random() - 0.5) * 30;
-      starPositions[i + 1] = (Math.random() - 0.5) * 30;
-      starPositions[i + 2] = (Math.random() - 0.5) * 30;
+      starPos[i] = (Math.random() - 0.5) * 30;
+      starPos[i + 1] = (Math.random() - 0.5) * 30;
+      starPos[i + 2] = (Math.random() - 0.5) * 30;
     }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starMat = new THREE.PointsMaterial({ color: 0x00e5ff, size: 0.06, transparent: true, opacity: 0.5 });
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0x94a3b8, size: 0.08, transparent: true, opacity: 0.5 });
     const stars = new THREE.Points(starGeo, starMat);
     scene.add(stars);
 
-    // Mouse drag controls
+    // Mouse Controls
     const dom = renderer.domElement;
     const onMouseDown = (e: MouseEvent) => {
       isDraggingRef.current = true;
@@ -121,8 +108,8 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
       if (!cameraRef.current) return;
       cameraRef.current.position.z = THREE.MathUtils.clamp(
         cameraRef.current.position.z + e.deltaY * 0.003,
-        2.0,
-        8.0
+        2.5,
+        7.5
       );
     };
 
@@ -131,20 +118,18 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     window.addEventListener('mouseup', onMouseUp);
     dom.addEventListener('wheel', onWheel, { passive: false });
 
-    // Animation loop
+    // Animation Loop
     let animId: number;
     const animate = () => {
       animId = requestAnimationFrame(animate);
 
       if (spacecraftGroupRef.current) {
         if (!isDraggingRef.current) {
-          rotationTargetRef.current.y += 0.0035;
+          rotationTargetRef.current.y += 0.004; // Smooth idle rotation
         }
         spacecraftGroupRef.current.rotation.y += (rotationTargetRef.current.y - spacecraftGroupRef.current.rotation.y) * 0.1;
         spacecraftGroupRef.current.rotation.x += (rotationTargetRef.current.x - spacecraftGroupRef.current.rotation.x) * 0.1;
       }
-
-      gridHelper.rotation.y += 0.001;
 
       renderer.render(scene, camera);
     };
@@ -173,7 +158,7 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     };
   }, []);
 
-  // Rebuild 3D Model when spacecraft components change
+  // Rebuild 3D Model dynamically
   useEffect(() => {
     if (!spacecraftGroupRef.current) return;
     const scGroup = spacecraftGroupRef.current;
@@ -189,62 +174,49 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     const propulsion = NASA_PROPULSION.find(p => p.id === state.propulsionSystemId) || NASA_PROPULSION[0];
     const selectedInsts = NASA_INSTRUMENTS.filter(i => state.selectedInstrumentIds.includes(i.id));
 
-    // Sci-Fi Metallic & Gold Foil Materials
+    // Materials
     const goldMliMaterial = new THREE.MeshStandardMaterial({
       color: 0xdfa028,
       metalness: 0.88,
-      roughness: 0.22,
+      roughness: 0.2
     });
 
-    const darkAlloyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x222d3d,
+    const alloyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x334155,
       metalness: 0.7,
       roughness: 0.35
     });
 
     const solarCellMaterial = new THREE.MeshStandardMaterial({
-      color: 0x07286a,
-      emissive: 0x041842,
-      metalness: 0.9,
+      color: 0x0369a1,
+      metalness: 0.95,
       roughness: 0.15
     });
 
-    const whiteCeramicMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf1f5f9,
+    const whiteMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
       metalness: 0.2,
       roughness: 0.5
     });
 
-    // 1. BUS CHASSIS MESH
-    let busMesh: THREE.Object3D;
-    if (chassis.category === 'cubesat_12u') {
-      const geo = new THREE.BoxGeometry(0.5, 0.9, 0.5);
-      busMesh = new THREE.Mesh(geo, goldMliMaterial);
-    } else if (chassis.category === 'medium_class') {
-      const geo = new THREE.CylinderGeometry(0.7, 0.7, 1.2, 6);
-      busMesh = new THREE.Mesh(geo, goldMliMaterial);
-    } else if (chassis.category === 'flagship') {
-      const geo = new THREE.CylinderGeometry(1.0, 1.0, 1.6, 8);
-      busMesh = new THREE.Mesh(geo, darkAlloyMaterial);
-    } else {
-      const geo = new THREE.BoxGeometry(0.8, 1.0, 0.8);
-      busMesh = new THREE.Mesh(geo, goldMliMaterial);
-    }
+    // 1. CHASSIS BUS
+    const busGeo = new THREE.BoxGeometry(0.85, 1.0, 0.85);
+    const busMesh = new THREE.Mesh(busGeo, goldMliMaterial);
     scGroup.add(busMesh);
 
     // 2. POWER SYSTEM
     if (power.type === 'solar_deployable') {
       [-1, 1].forEach((dir) => {
         const wingGroup = new THREE.Group();
-        const boomGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3);
-        const boom = new THREE.Mesh(boomGeo, darkAlloyMaterial);
-        boom.rotation.z = Math.PI / 2;
-        boom.position.x = dir * 0.55;
-        wingGroup.add(boom);
+        const strutGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.35);
+        const strut = new THREE.Mesh(strutGeo, alloyMaterial);
+        strut.rotation.z = Math.PI / 2;
+        strut.position.x = dir * 0.6;
+        wingGroup.add(strut);
 
-        const panelGeo = new THREE.BoxGeometry(0.9, 0.5, 0.03);
+        const panelGeo = new THREE.BoxGeometry(1.0, 0.55, 0.03);
         const panel = new THREE.Mesh(panelGeo, solarCellMaterial);
-        panel.position.x = dir * 1.1;
+        panel.position.x = dir * 1.25;
         wingGroup.add(panel);
 
         scGroup.add(wingGroup);
@@ -257,57 +229,56 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     } else if (power.type === 'solar_ultraflex') {
       [-1, 1].forEach((dir) => {
         const wingGroup = new THREE.Group();
-        const discGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.02, 16);
+        const discGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.02, 24);
         const disc = new THREE.Mesh(discGeo, solarCellMaterial);
         disc.rotation.x = Math.PI / 2;
-        disc.position.x = dir * 1.3;
+        disc.position.x = dir * 1.45;
         wingGroup.add(disc);
 
-        const strutGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.7);
-        const strut = new THREE.Mesh(strutGeo, darkAlloyMaterial);
+        const strutGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.8);
+        const strut = new THREE.Mesh(strutGeo, alloyMaterial);
         strut.rotation.z = Math.PI / 2;
-        strut.position.x = dir * 0.75;
+        strut.position.x = dir * 0.8;
         wingGroup.add(strut);
 
         scGroup.add(wingGroup);
         explodedPartsRef.current.push({
           mesh: wingGroup,
           basePos: wingGroup.position.clone(),
-          explodeDir: new THREE.Vector3(dir * 1.4, 0, 0)
+          explodeDir: new THREE.Vector3(dir * 1.3, 0, 0)
         });
       });
     } else if (power.type === 'rtg_nextgen') {
       const rtgGroup = new THREE.Group();
-      const cylGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.6, 12);
-      const cyl = new THREE.Mesh(cylGeo, darkAlloyMaterial);
+      const cylGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.65, 16);
+      const cyl = new THREE.Mesh(cylGeo, alloyMaterial);
       rtgGroup.add(cyl);
 
       for (let f = 0; f < 6; f++) {
-        const finGeo = new THREE.BoxGeometry(0.38, 0.5, 0.02);
-        const fin = new THREE.Mesh(finGeo, darkAlloyMaterial);
+        const finGeo = new THREE.BoxGeometry(0.42, 0.55, 0.02);
+        const fin = new THREE.Mesh(finGeo, alloyMaterial);
         fin.rotation.y = (f * Math.PI) / 3;
         rtgGroup.add(fin);
       }
-      rtgGroup.position.set(0.65, 0.1, -0.4);
+      rtgGroup.position.set(0.68, 0, -0.4);
       scGroup.add(rtgGroup);
       explodedPartsRef.current.push({
         mesh: rtgGroup,
         basePos: rtgGroup.position.clone(),
-        explodeDir: new THREE.Vector3(1.2, 0.4, -0.6)
+        explodeDir: new THREE.Vector3(1.2, 0.3, -0.6)
       });
     }
 
-    // 3. COMMS ANTENNA
+    // 3. COMMS DISH
     const dishGroup = new THREE.Group();
-    const dishRadius = 0.45;
-    const dishGeo = new THREE.SphereGeometry(dishRadius, 24, 12, 0, Math.PI * 2, 0, Math.PI / 3);
-    const dish = new THREE.Mesh(dishGeo, goldMliMaterial);
+    const dishGeo = new THREE.SphereGeometry(0.45, 24, 12, 0, Math.PI * 2, 0, Math.PI / 3);
+    const dish = new THREE.Mesh(dishGeo, whiteMat);
     dish.rotation.x = Math.PI;
     dishGroup.add(dish);
 
-    const feedGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.35);
-    const feed = new THREE.Mesh(feedGeo, darkAlloyMaterial);
-    feed.position.z = -0.18;
+    const feedGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.4);
+    const feed = new THREE.Mesh(feedGeo, alloyMaterial);
+    feed.position.z = -0.2;
     feed.rotation.x = Math.PI / 2;
     dishGroup.add(feed);
 
@@ -316,76 +287,63 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     explodedPartsRef.current.push({
       mesh: dishGroup,
       basePos: dishGroup.position.clone(),
-      explodeDir: new THREE.Vector3(0, 1.2, 0)
+      explodeDir: new THREE.Vector3(0, 1.1, 0)
     });
 
     // 4. PROPULSION ENGINE NOZZLE
-    if (propulsion.type !== 'none') {
-      const engineGroup = new THREE.Group();
-      const nozzleGeo = new THREE.ConeGeometry(0.22, 0.45, 16, 1, true);
-      const nozzleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3 });
-      const nozzle = new THREE.Mesh(nozzleGeo, nozzleMat);
-      nozzle.rotation.x = Math.PI;
-      engineGroup.add(nozzle);
-
-      engineGroup.position.set(0, -0.75, 0);
-      scGroup.add(engineGroup);
-      explodedPartsRef.current.push({
-        mesh: engineGroup,
-        basePos: engineGroup.position.clone(),
-        explodeDir: new THREE.Vector3(0, -1.2, 0)
-      });
-    }
+    const engineGroup = new THREE.Group();
+    const nozzleGeo = new THREE.ConeGeometry(0.25, 0.45, 16, 1, true);
+    const nozzle = new THREE.Mesh(nozzleGeo, alloyMaterial);
+    nozzle.rotation.x = Math.PI;
+    engineGroup.add(nozzle);
+    engineGroup.position.set(0, -0.72, 0);
+    scGroup.add(engineGroup);
+    explodedPartsRef.current.push({
+      mesh: engineGroup,
+      basePos: engineGroup.position.clone(),
+      explodeDir: new THREE.Vector3(0, -1.1, 0)
+    });
 
     // 5. SCIENCE INSTRUMENTS
     selectedInsts.forEach((inst, idx) => {
       const instGroup = new THREE.Group();
       if (inst.category === 'optical') {
-        const tubeGeo = new THREE.CylinderGeometry(0.09, 0.11, 0.35, 12);
-        const tube = new THREE.Mesh(tubeGeo, darkAlloyMaterial);
+        const tubeGeo = new THREE.CylinderGeometry(0.1, 0.12, 0.35, 12);
+        const tube = new THREE.Mesh(tubeGeo, alloyMaterial);
         tube.rotation.x = Math.PI / 2;
         instGroup.add(tube);
-        const lensGeo = new THREE.CircleGeometry(0.08, 16);
-        const lensMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff });
+        const lensGeo = new THREE.CircleGeometry(0.09, 16);
+        const lensMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
         const lens = new THREE.Mesh(lensGeo, lensMat);
         lens.position.z = 0.18;
         instGroup.add(lens);
-      } else if (inst.category === 'particles_fields') {
-        const boomGeo = new THREE.CylinderGeometry(0.012, 0.012, 1.2);
-        const boom = new THREE.Mesh(boomGeo, darkAlloyMaterial);
-        boom.rotation.z = Math.PI / 3;
-        instGroup.add(boom);
-        const sensorGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-        const sensor = new THREE.Mesh(sensorGeo, goldMliMaterial);
-        sensor.position.set(0.6, 0.35, 0);
-        instGroup.add(sensor);
       } else if (inst.category === 'radar_lidar') {
-        const antGeo = new THREE.CylinderGeometry(0.01, 0.01, 1.4);
-        const ant = new THREE.Mesh(antGeo, whiteCeramicMaterial);
+        const antGeo = new THREE.CylinderGeometry(0.015, 0.015, 1.4);
+        const ant = new THREE.Mesh(antGeo, whiteMat);
         ant.rotation.z = Math.PI / 2;
         instGroup.add(ant);
       } else {
-        const boxGeo = new THREE.BoxGeometry(0.18, 0.18, 0.2);
-        const box = new THREE.Mesh(boxGeo, whiteCeramicMaterial);
+        const boxGeo = new THREE.BoxGeometry(0.2, 0.2, 0.22);
+        const box = new THREE.Mesh(boxGeo, whiteMat);
         instGroup.add(box);
       }
 
       const angle = (idx / Math.max(1, selectedInsts.length)) * Math.PI * 2;
-      const x = Math.cos(angle) * 0.45;
-      const z = Math.sin(angle) * 0.45;
+      const x = Math.cos(angle) * 0.48;
+      const z = Math.sin(angle) * 0.48;
       instGroup.position.set(x, -0.1, z);
       scGroup.add(instGroup);
 
       explodedPartsRef.current.push({
         mesh: instGroup,
         basePos: instGroup.position.clone(),
-        explodeDir: new THREE.Vector3(x * 1.8, 0.3, z * 1.8)
+        explodeDir: new THREE.Vector3(x * 1.6, 0.2, z * 1.6)
       });
     });
 
   }, [state.chassisId, state.powerSystemId, state.commsSystemId, state.propulsionSystemId, state.selectedInstrumentIds]);
 
-  // Exploded View toggle
+  // Handle exploded toggle
   useEffect(() => {
     explodedPartsRef.current.forEach(item => {
       const targetPos = exploded 
@@ -396,67 +354,61 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
   }, [exploded]);
 
   const toggleExploded = () => {
-    soundFx.playComponentMount();
+    soundFx.playClick();
     setExploded(!exploded);
   };
 
-  const resetCamera = () => {
+  const resetView = () => {
     soundFx.playClick();
     if (cameraRef.current) {
-      cameraRef.current.position.set(0, 1.8, 4.4);
-      rotationTargetRef.current = { x: 0.35, y: 0.6 };
+      cameraRef.current.position.set(0, 0.8, 4.8);
+      rotationTargetRef.current = { x: 0.25, y: 0.5 };
     }
   };
 
-  const chassis = NASA_CHASSIS.find(c => c.id === state.chassisId);
-  const power = NASA_POWER_SYSTEMS.find(p => p.id === state.powerSystemId);
-
   return (
-    <div className="relative w-full h-[370px] md:h-[460px] bg-[#070D1F] rounded-2xl border border-cyan-500/30 overflow-hidden shadow-[0_0_30px_rgba(0,229,255,0.15)]">
-      {/* 3D Canvas */}
-      <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+    <div className="relative w-full h-[380px] sm:h-[440px] bg-[#0A1329]/90 rounded-2xl border border-cyan-500/20 overflow-hidden shadow-2xl flex flex-col justify-between p-3.5">
+      
+      {/* ThreeJS WebGL Canvas Container */}
+      <div ref={containerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Sci-Fi Shipyard HUD Reticle Top Left */}
-      <div className="absolute top-3 left-3 pointer-events-none flex flex-col gap-1">
-        <div className="flex items-center gap-2 bg-[#070B19]/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-cyan-400/40 text-xs font-mono text-cyan-300">
-          <Crosshair className="w-3.5 h-3.5 text-cyan-400 animate-spin-slow" />
-          <span>ORBITAL DRYDOCK • HANGAR BAY 1</span>
-        </div>
-        <div className="text-[11px] text-slate-400 font-mono pl-1">
-          {chassis?.name} • {power?.name.split('(')[0]}
+      {/* Top Left Badge */}
+      <div className="relative z-10 flex items-center gap-2">
+        <div className="flex items-center gap-2 bg-[#070B19]/85 px-3 py-1.5 rounded-lg border border-cyan-500/30 text-xs font-mono text-cyan-400 backdrop-blur-md">
+          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          <span>3D SPACECRAFT BAY</span>
         </div>
       </div>
 
-      {/* Controls Overlay Bottom Right */}
-      <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-[#070B19]/90 backdrop-blur-md p-1.5 rounded-xl border border-cyan-500/30 shadow-lg">
-        <button
-          onClick={toggleExploded}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
-            exploded 
-              ? 'bg-cyan-500 text-space-950 shadow-[0_0_15px_rgba(0,229,255,0.5)]' 
-              : 'bg-[#111e3b] text-cyan-300 hover:bg-[#1a2e5a]'
-          }`}
-          title="Toggle Exploded Subsystems CAD View"
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>{exploded ? 'ASSEMBLE' : 'EXPLODE CAD'}</span>
-        </button>
+      {/* Bottom Controls Bar */}
+      <div className="relative z-10 flex items-center justify-between gap-2 pt-2">
+        <div className="bg-[#070B19]/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-[11px] font-mono text-slate-300">
+          <span className="text-cyan-400 font-bold">{state.selectedInstrumentIds.length}</span> Payloads Attached
+        </div>
 
-        <button
-          onClick={resetCamera}
-          className="p-1.5 rounded-lg bg-[#111e3b] text-slate-300 hover:text-white hover:bg-[#1a2e5a] transition"
-          title="Reset Camera View"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
-      </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleExploded}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition backdrop-blur-md ${
+              exploded 
+                ? 'bg-cyan-500 text-slate-950 font-bold shadow-md' 
+                : 'bg-[#0E172F]/90 text-slate-200 border border-white/15 hover:bg-[#152347]'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>{exploded ? 'ASSEMBLE' : 'EXPLODE'}</span>
+          </button>
 
-      {/* Ship Outfitting Stats Badge Bottom Left */}
-      <div className="absolute bottom-3 left-3 bg-[#070B19]/85 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-xs font-mono flex items-center gap-3 text-slate-300">
-        <div>
-          <span className="text-slate-400">HARDPOINTS:</span> <span className="text-cyan-400 font-bold">{state.selectedInstrumentIds.length} MOUNTED</span>
+          <button
+            onClick={resetView}
+            className="p-1.5 rounded-lg bg-[#0E172F]/90 text-slate-300 hover:text-white border border-white/15 transition backdrop-blur-md"
+            title="Reset Angle"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
+
     </div>
   );
 };
