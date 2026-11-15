@@ -15,11 +15,13 @@ import { SimpleMissionBuilder } from './components/SimpleMissionBuilder';
 import { MissionSimulation } from './components/MissionSimulation';
 import { PostMissionReport } from './components/PostMissionReport';
 import { TutorialModal } from './components/TutorialModal';
+import { EvaAssistant } from './components/EvaAssistant';
 
 export function App() {
   // Step 1: Destination (with Cosmic Scroll Entrance), Step 2: Build Spacecraft, Step 3: Launch Simulation, Step 4: Mission Results
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isTeamMode, setIsTeamMode] = useState<boolean>(true);
+  const [isChiefEngineerMode, setIsChiefEngineerMode] = useState<boolean>(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
   const [evaluationReport, setEvaluationReport] = useState<MissionEvaluationReport | null>(null);
@@ -175,20 +177,21 @@ export function App() {
 
         {/* STEP 2: BUILD SPACECRAFT (SIMPLIFIED & CLEAN) */}
         {currentStep === 2 && (
-          <div className="max-w-6xl mx-auto p-4 md:p-6 pb-20">
+          <div className="max-w-7xl mx-auto p-2 sm:p-4 pb-20">
             <SimpleMissionBuilder
               state={state}
               setState={setState}
               budgets={budgets}
               onLaunch={handleStartSimulation}
-              isTeamMode={isTeamMode}
+              isChiefEngineerMode={isChiefEngineerMode}
+              onToggleMode={() => setIsChiefEngineerMode(!isChiefEngineerMode)}
             />
           </div>
         )}
 
         {/* STEP 3: FLIGHT SIMULATION & ORBIT */}
         {currentStep === 3 && (
-          <div className="max-w-6xl mx-auto p-4 md:p-6 pb-20">
+          <div className="max-w-7xl mx-auto p-2 sm:p-4 pb-20">
             <MissionSimulation
               state={state}
               budgets={budgets}
@@ -210,6 +213,13 @@ export function App() {
         )}
 
       </main>
+
+      {/* Flight Director EVA - Conversational AI Co-Pilot */}
+      <EvaAssistant
+        budgets={budgets}
+        state={state}
+        currentStep={currentStep}
+      />
 
       {/* Flight Manual / Guide Modal */}
       <TutorialModal

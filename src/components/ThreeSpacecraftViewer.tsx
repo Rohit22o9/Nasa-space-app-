@@ -8,14 +8,22 @@ import {
   NASA_PROPULSION,
   NASA_INSTRUMENTS 
 } from '../data/nasaData';
-import { Layers, RotateCcw, Sparkles } from 'lucide-react';
+import { Layers, RotateCcw, Sparkles, Zap, Radio, Rocket, Camera } from 'lucide-react';
 import { soundFx } from '../utils/audio';
 
 interface Props {
   state: MissionDesignState;
+  className?: string;
+  onSelectSlot?: (category: 'payload' | 'power' | 'rocket') => void;
+  activeCategory?: string;
 }
 
-export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
+export const ThreeSpacecraftViewer: React.FC<Props> = ({ 
+  state, 
+  className,
+  onSelectSlot,
+  activeCategory 
+}) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [exploded, setExploded] = useState<boolean>(false);
 
@@ -366,48 +374,126 @@ export const ThreeSpacecraftViewer: React.FC<Props> = ({ state }) => {
     }
   };
 
+  const power = NASA_POWER_SYSTEMS.find(p => p.id === state.powerSystemId) || NASA_POWER_SYSTEMS[1];
+
   return (
-    <div className="relative w-full h-[380px] sm:h-[440px] bg-[#0A1329]/90 rounded-2xl border border-cyan-500/20 overflow-hidden shadow-2xl flex flex-col justify-between p-3.5">
+    <div className={className || "relative w-full h-[380px] sm:h-[440px] bg-[#0A1329]/90 rounded-2xl border border-cyan-500/20 overflow-hidden shadow-2xl flex flex-col justify-between p-3.5"}>
       
       {/* ThreeJS WebGL Canvas Container */}
       <div ref={containerRef} className="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Top Left Badge */}
-      <div className="relative z-10 flex items-center gap-2">
-        <div className="flex items-center gap-2 bg-[#070B19]/85 px-3 py-1.5 rounded-lg border border-cyan-500/30 text-xs font-mono text-cyan-400 backdrop-blur-md">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <span>3D SPACECRAFT BAY</span>
-        </div>
-      </div>
+      {/* Interactive 3D Snap Anchor Pins overlay */}
+      {onSelectSlot && (
+        <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4 sm:p-6">
+          <div className="flex items-center justify-between">
+            {/* Top-Left: Science Payloads Anchor Node */}
+            <button
+              onClick={() => {
+                soundFx.playSnap();
+                onSelectSlot('payload');
+              }}
+              className={`pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl border backdrop-blur-md text-xs font-mono transition-all hover:scale-105 active:scale-95 ${
+                activeCategory === 'payload'
+                  ? 'bg-cyan-500/30 border-cyan-400 text-cyan-200 shadow-[0_0_15px_rgba(0,229,255,0.4)]'
+                  : 'bg-[#070e24]/80 border-cyan-500/30 text-slate-300 hover:border-cyan-400'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <Camera className="w-3.5 h-3.5 text-cyan-400" />
+              <span>[+] PAYLOAD BAY ({state.selectedInstrumentIds.length} Mounted)</span>
+            </button>
 
-      {/* Bottom Controls Bar */}
-      <div className="relative z-10 flex items-center justify-between gap-2 pt-2">
-        <div className="bg-[#070B19]/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-[11px] font-mono text-slate-300">
-          <span className="text-cyan-400 font-bold">{state.selectedInstrumentIds.length}</span> Payloads Attached
-        </div>
+            {/* Top-Right: Power Bay Anchor Node */}
+            <button
+              onClick={() => {
+                soundFx.playSnap();
+                onSelectSlot('power');
+              }}
+              className={`pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl border backdrop-blur-md text-xs font-mono transition-all hover:scale-105 active:scale-95 ${
+                activeCategory === 'power'
+                  ? 'bg-yellow-500/30 border-yellow-400 text-yellow-200 shadow-[0_0_15px_rgba(250,204,21,0.4)]'
+                  : 'bg-[#070e24]/80 border-yellow-500/30 text-slate-300 hover:border-yellow-400'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-yellow-400" />
+              <span>[+] POWER CORE ({power.name.split(' ')[0]})</span>
+            </button>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleExploded}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition backdrop-blur-md ${
-              exploded 
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow-md' 
-                : 'bg-[#0E172F]/90 text-slate-200 border border-white/15 hover:bg-[#152347]'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>{exploded ? 'ASSEMBLE' : 'EXPLODE'}</span>
-          </button>
+          <div className="flex items-center justify-between">
+            {/* Bottom-Left: Propulsion Anchor Node */}
+            <button
+              onClick={() => {
+                soundFx.playSnap();
+                onSelectSlot('rocket');
+              }}
+              className={`pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-xl border backdrop-blur-md text-xs font-mono transition-all hover:scale-105 active:scale-95 ${
+                activeCategory === 'rocket'
+                  ? 'bg-purple-500/30 border-purple-400 text-purple-200 shadow-[0_0_15px_rgba(192,132,252,0.4)]'
+                  : 'bg-[#070e24]/80 border-purple-500/30 text-slate-300 hover:border-purple-400'
+              }`}
+            >
+              <Rocket className="w-3.5 h-3.5 text-purple-400" />
+              <span>[+] PROPULSION & BOOSTER</span>
+            </button>
 
-          <button
-            onClick={resetView}
-            className="p-1.5 rounded-lg bg-[#0E172F]/90 text-slate-300 hover:text-white border border-white/15 transition backdrop-blur-md"
-            title="Reset Angle"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+            {/* Assemble / Explode CAD & Reset View Buttons */}
+            <div className="pointer-events-auto flex items-center gap-2">
+              <button
+                onClick={toggleExploded}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition backdrop-blur-md border ${
+                  exploded 
+                    ? 'bg-cyan-500 border-cyan-400 text-slate-950 font-bold shadow-lg' 
+                    : 'bg-[#070e24]/85 text-slate-200 border-white/15 hover:border-cyan-400 hover:bg-[#0b1633]'
+                }`}
+                title="X-Ray Explode Spacecraft Subsystems"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>{exploded ? 'ASSEMBLE' : 'EXPLODE CAD'}</span>
+              </button>
+
+              <button
+                onClick={resetView}
+                className="p-1.5 rounded-xl bg-[#070e24]/85 text-slate-300 hover:text-white border border-white/15 transition backdrop-blur-md hover:border-cyan-400"
+                title="Reset Camera Angle"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Fallback bottom bar when onSelectSlot is not passed */}
+      {!onSelectSlot && (
+        <div className="relative z-10 flex items-center justify-between gap-2 pt-2">
+          <div className="bg-[#070B19]/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-[11px] font-mono text-slate-300">
+            <span className="text-cyan-400 font-bold">{state.selectedInstrumentIds.length}</span> Payloads Attached
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleExploded}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition backdrop-blur-md ${
+                exploded 
+                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-md' 
+                  : 'bg-[#0E172F]/90 text-slate-200 border border-white/15 hover:bg-[#152347]'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{exploded ? 'ASSEMBLE' : 'EXPLODE'}</span>
+            </button>
+
+            <button
+              onClick={resetView}
+              className="p-1.5 rounded-lg bg-[#0E172F]/90 text-slate-300 hover:text-white border border-white/15 transition backdrop-blur-md"
+              title="Reset Angle"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );

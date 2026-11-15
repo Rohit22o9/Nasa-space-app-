@@ -14,10 +14,13 @@ import {
   Atom, 
   Sparkles, 
   Sun, 
-  Layers, 
+  Moon,
   ChevronRight,
   ShieldCheck,
-  Check
+  Check,
+  RotateCcw,
+  Sliders,
+  Users
 } from 'lucide-react';
 
 interface Props {
@@ -25,7 +28,8 @@ interface Props {
   setState: React.Dispatch<React.SetStateAction<MissionDesignState>>;
   budgets: EngineeringBudgets;
   onLaunch: () => void;
-  isTeamMode: boolean;
+  isChiefEngineerMode: boolean;
+  onToggleMode: () => void;
 }
 
 export const SimpleMissionBuilder: React.FC<Props> = ({
@@ -33,9 +37,14 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
   setState,
   budgets,
   onLaunch,
+  isChiefEngineerMode,
+  onToggleMode
 }) => {
   const scenario = NASA_SCENARIOS.find(s => s.id === state.scenarioId) || NASA_SCENARIOS[0];
-  const [activeCategory, setActiveCategory] = useState<'payload' | 'power' | 'rocket'>('payload');
+  const [activeCategory, setActiveCategory] = useState<'payload' | 'power' | 'rocket' | 'engineering'>('payload');
+
+  // Interactive Sun / Eclipse shadow simulator slider (0 = full sunlight, 1 = deep shadow)
+  const [eclipseSimFraction, setEclipseSimFraction] = useState<number>(0);
 
   const payloadOptions = [
     {
@@ -44,7 +53,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
       icon: <Camera className="w-4 h-4 text-sky-400" />,
       science: '+130 pts',
       specs: '38kg • 65W • $28M',
-      desc: 'Visible & near-IR camera for high-resolution surface mapping.'
+      desc: 'Visible & near-IR camera for sub-meter high-resolution surface mapping.'
     },
     {
       id: 'inst_subsurface_radar',
@@ -52,7 +61,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
       icon: <Radio className="w-4 h-4 text-cyan-400" />,
       science: '+220 pts',
       specs: '82kg • 240W • $68M',
-      desc: 'Penetrates 3km deep to detect underground ice and liquid layers.'
+      desc: 'Penetrates 3km deep to detect underground ice and liquid reservoirs.'
     },
     {
       id: 'inst_mass_spec',
@@ -60,7 +69,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
       icon: <Atom className="w-4 h-4 text-purple-400" />,
       science: '+190 pts',
       specs: '24kg • 42W • $35M',
-      desc: 'Measures organic molecules, water vapor, and prebiotic traces.'
+      desc: 'Samples water plumes and exospheres for organic molecules and carbon.'
     },
     {
       id: 'inst_neutron_spectrometer',
@@ -68,7 +77,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
       icon: <Sparkles className="w-4 h-4 text-amber-400" />,
       science: '+140 pts',
       specs: '19kg • 32W • $22M',
-      desc: 'Directly detects water-equivalent hydrogen buried in regolith.'
+      desc: 'Directly detects water-equivalent hydrogen buried beneath the surface.'
     }
   ];
 
@@ -79,7 +88,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
       icon: <Sun className="w-4 h-4 text-yellow-400" />,
       science: 'Clean Solar',
       specs: '550W (at Earth/Moon) • $18M',
-      desc: 'Generates free power from sunlight. Loses output in eclipse shadow.'
+      desc: 'Generates free power from sunlight. Drops to 0W during eclipse shadow.'
     },
     {
       id: 'pwr_rtg_nextgen',
@@ -87,7 +96,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
       icon: <Zap className="w-4 h-4 text-orange-400" />,
       science: '24/7 Deep Space',
       specs: '500W Constant • $95M',
-      desc: 'Continuous nuclear power. Works in permanent darkness and deep space.'
+      desc: 'Continuous nuclear power. Works in permanent shadow and deep space.'
     }
   ];
 
@@ -111,7 +120,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
   ];
 
   const toggleInstrument = (instId: string) => {
-    soundFx.playClick();
+    soundFx.playSnap();
     setState(prev => {
       const exists = prev.selectedInstrumentIds.includes(instId);
       const updated = exists
@@ -122,88 +131,141 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
   };
 
   const setPower = (id: string) => {
-    soundFx.playClick();
+    soundFx.playSnap();
     setState(prev => ({ ...prev, powerSystemId: id }));
   };
 
   const setRocket = (id: string) => {
-    soundFx.playClick();
+    soundFx.playSnap();
     setState(prev => ({ ...prev, launchVehicleId: id }));
   };
 
-  const canLaunch = budgets.massStatus !== 'critical' && 
-                    budgets.powerStatus !== 'critical' && 
-                    budgets.costStatus !== 'critical';
+  // Real-time simulated power considering Sun / Eclipse slider
+  const simulatedGenerationW = state.powerSystemId === 'pwr_rtg_nextgen'
+    ? budgets.powerGeneratedSunlightW
+    : budgets.powerGeneratedSunlightW * (1.0 - eclipseSimFraction);
+
+  const simulatedPowerSurplusW = simulatedGenerationW - (eclipseSimFraction > 0.5 ? budgets.totalNightPowerConsumptionW : budgets.totalDayPowerConsumptionW);
+
+  const isOverweight = budgets.massStatus === 'critical';
+  const canLaunch = !isOverweight && budgets.powerStatus !== 'critical' && budgets.costStatus !== 'critical';
 
   return (
-    <div className="relative w-full h-[78vh] min-h-[560px] rounded-3xl overflow-hidden bg-[#070B19] border border-cyan-500/20 shadow-2xl flex flex-col justify-between">
+    <div className="relative w-full h-[80vh] min-h-[600px] rounded-3xl overflow-hidden bg-[#050814] border border-cyan-500/25 shadow-2xl flex flex-col justify-between">
       
-      {/* 1. 3D SPACECRAFT STAGE (FULL BACKGROUND HERO) */}
+      {/* 1. 3D SPACECRAFT STAGE AS FULL BACKGROUND */}
       <div className="absolute inset-0 w-full h-full z-0">
-        <ThreeSpacecraftViewer state={state} />
+        <ThreeSpacecraftViewer 
+          state={state} 
+          className="relative w-full h-full bg-transparent overflow-hidden flex flex-col justify-between"
+          onSelectSlot={(cat) => setActiveCategory(cat)}
+          activeCategory={activeCategory}
+        />
       </div>
 
-      {/* Subtle Dark Vignette at Top and Bottom for HUD legibility */}
-      <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#070B19]/90 via-[#070B19]/50 to-transparent pointer-events-none z-10" />
-      <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#070B19] via-[#070B19]/80 to-transparent pointer-events-none z-10" />
+      {/* Shading gradients for HUD contrast */}
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[#050814]/95 via-[#050814]/60 to-transparent pointer-events-none z-10" />
+      <div className="absolute inset-x-0 bottom-0 h-52 bg-gradient-to-t from-[#050814] via-[#050814]/90 to-transparent pointer-events-none z-10" />
 
-      {/* 2. FLOATING TOP HUD (SLEEK HORIZONTAL RIBBON) */}
-      <div className="relative z-20 px-4 sm:px-6 pt-4 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
+      {/* 2. TOP HUD: 3 VITAL CAUSE-AND-EFFECT LIVING METERS */}
+      <div className="relative z-20 px-4 sm:px-6 pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pointer-events-none">
         
-        {/* Mission Destination Pill */}
-        <div className="flex items-center gap-2.5 bg-[#070B19]/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-cyan-500/30 text-xs font-mono text-cyan-300 shadow-md pointer-events-auto">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          <span>DESTINATION: <strong>{scenario.destination}</strong></span>
+        {/* Mission Destination & Mode Badge */}
+        <div className="flex items-center gap-2 pointer-events-auto">
+          <div className="flex items-center gap-2 bg-[#070e24]/90 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-cyan-500/30 text-xs font-mono text-cyan-300 shadow-md">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+            <span>MISSION: <strong>{scenario.destination}</strong></span>
+          </div>
+
+          <button
+            onClick={onToggleMode}
+            className={`px-3 py-1.5 rounded-full text-xs font-mono font-bold transition flex items-center gap-1.5 border backdrop-blur-md ${
+              isChiefEngineerMode
+                ? 'bg-purple-900/80 border-purple-400 text-purple-200 shadow-glow-purple'
+                : 'bg-[#0b1633]/80 border-cyan-400/40 text-cyan-300 hover:text-white'
+            }`}
+            title="Toggle Beginner Cadet vs Advanced Chief Engineer Mode"
+          >
+            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+            <span>{isChiefEngineerMode ? 'CHIEF ENGINEER MODE' : 'CADET MODE'}</span>
+          </button>
         </div>
 
-        {/* Live RPG-style Stats Ribbon */}
-        <div className="flex items-center gap-2 sm:gap-4 bg-[#070B19]/85 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10 text-xs font-mono shadow-lg pointer-events-auto">
-          {/* Science Score */}
-          <div className="flex items-center gap-1.5 text-cyan-400">
-            <Award className="w-3.5 h-3.5" />
+        {/* 3 Living Vital Meters (Mass vs Rocket, Power Balance, Budget) */}
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4 bg-[#070e24]/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 text-xs font-mono shadow-xl pointer-events-auto">
+          
+          {/* Science Score Gauge */}
+          <div className="flex items-center gap-1.5">
+            <Award className="w-4 h-4 text-cyan-400" />
             <span className="text-white font-bold">{budgets.totalScienceScore}</span>
-            <span className="text-[10px] text-slate-400">pts</span>
+            <span className="text-[10px] text-cyan-400 font-semibold">{budgets.totalScienceScore >= scenario.minScienceTarget ? '⭐⭐⭐' : '⭐'}</span>
           </div>
 
           <span className="text-slate-600">•</span>
 
-          {/* Mass */}
-          <div className="flex items-center gap-1.5">
-            <Weight className="w-3.5 h-3.5 text-sky-400" />
-            <span className={budgets.massStatus === 'critical' ? 'text-red-400 font-bold' : 'text-slate-200'}>
-              {budgets.totalWetMassKg.toFixed(0)} kg
-            </span>
+          {/* Mass vs Rocket Silhouette */}
+          <div className={`flex items-center gap-1.5 ${isOverweight ? 'text-red-400 font-bold animate-pulse' : 'text-slate-200'}`}>
+            <Weight className="w-4 h-4 text-sky-400" />
+            <span>{budgets.totalWetMassKg.toFixed(0)} kg</span>
+            <span className="text-[10px] text-slate-400">/ {budgets.launchVehicleMaxCapacityKg} kg</span>
           </div>
 
           <span className="text-slate-600">•</span>
 
-          {/* Power */}
-          <div className="flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-yellow-400" />
-            <span className={budgets.powerStatus === 'critical' ? 'text-red-400 font-bold' : 'text-yellow-400 font-bold'}>
-              {budgets.powerMarginSunlightW > 0 ? `+${budgets.powerMarginSunlightW.toFixed(0)}W` : `${budgets.powerMarginSunlightW.toFixed(0)}W`}
-            </span>
+          {/* Power Balance with simulated lighting */}
+          <div className={`flex items-center gap-1.5 ${simulatedPowerSurplusW < 0 ? 'text-red-400 font-bold' : 'text-yellow-400 font-bold'}`}>
+            <Zap className="w-4 h-4" />
+            <span>{simulatedPowerSurplusW > 0 ? `+${simulatedPowerSurplusW.toFixed(0)}W` : `${simulatedPowerSurplusW.toFixed(0)}W`}</span>
           </div>
 
           <span className="text-slate-600">•</span>
 
-          {/* Budget */}
-          <div className="flex items-center gap-1.5">
-            <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-            <span className={budgets.costStatus === 'critical' ? 'text-red-400 font-bold' : 'text-emerald-300 font-bold'}>
-              ${budgets.totalCostM.toFixed(0)}M
-            </span>
+          {/* Budget Piggy Bank */}
+          <div className={`flex items-center gap-1.5 ${budgets.costStatus === 'critical' ? 'text-red-400 font-bold' : 'text-emerald-300 font-bold'}`}>
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <span>${budgets.totalCostM.toFixed(0)}M</span>
+            <span className="text-[10px] text-slate-400 font-normal">(${budgets.remainingBudgetM.toFixed(0)}M left)</span>
           </div>
+
         </div>
 
       </div>
 
-      {/* 3. FLOATING BOTTOM CUSTOMIZATION DOCK (GAME LOADOUT TRAY) */}
+      {/* 3. INTERACTIVE SUN / ECLIPSE TIME-SLIDER (EDUCATIONAL CAUSE & EFFECT) */}
+      <div className="relative z-20 px-6 max-w-sm ml-auto pointer-events-auto">
+        <div className="bg-[#070e24]/85 backdrop-blur-md p-2.5 rounded-2xl border border-white/10 shadow-lg text-xs space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
+            <span className="flex items-center gap-1 text-yellow-400">
+              <Sun className="w-3.5 h-3.5" /> Sunlight Test
+            </span>
+            <span className="flex items-center gap-1 text-sky-400">
+              <Moon className="w-3.5 h-3.5" /> Eclipse Shadow
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={eclipseSimFraction}
+            onChange={(e) => setEclipseSimFraction(parseFloat(e.target.value))}
+            className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+          />
+          <div className="text-[10px] font-mono text-slate-400 text-center">
+            {eclipseSimFraction === 0 ? '☀️ In Full Sunlight (+550W generated)' : 
+             eclipseSimFraction < 1 ? `Entering Shadow: ${(simulatedGenerationW).toFixed(0)}W solar output` :
+             state.powerSystemId === 'pwr_rtg_nextgen' ? '🌑 In Shadow: Nuclear RTG supplies 500W constantly!' :
+             '🌑 Deep Shadow: Solar=0W, running on batteries!'}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. BOTTOM FLOATING GAME DOCK (SLOT TRAY & LAUNCH BAR) */}
       <div className="relative z-20 p-4 sm:p-5 max-w-5xl mx-auto w-full space-y-3">
         
-        {/* Category Pills (Tabs) */}
+        {/* Category Tabs */}
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 bg-[#070B19]/90 p-1 rounded-2xl border border-white/10 backdrop-blur-md">
+          <div className="flex items-center gap-1.5 bg-[#070e24]/95 p-1 rounded-2xl border border-white/10 backdrop-blur-md">
             {[
               { id: 'payload' as const, label: '🔬 Science Payload', count: `${state.selectedInstrumentIds.length}/4` },
               { id: 'power' as const, label: '⚡ Power Core', count: state.powerSystemId === 'pwr_rtg_nextgen' ? 'RTG' : 'Solar' },
@@ -231,19 +293,21 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
             ))}
           </div>
 
-          {/* Quick Instructions badge */}
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-            <span>Click modules to mount onto spacecraft</span>
-          </div>
+          {/* Chief Engineer Mode Advanced Options */}
+          {isChiefEngineerMode && (
+            <div className="hidden sm:flex items-center gap-3 text-xs font-mono text-cyan-300 bg-[#070e24]/80 px-3 py-1 rounded-xl border border-purple-500/30">
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Avionics: Redundant • Delta-V Margin: +{budgets.deltaVMarginMs.toFixed(0)} m/s</span>
+            </div>
+          )}
         </div>
 
-        {/* Module Chips Tray (Active Category Items) */}
-        <div className="bg-[#070B19]/90 border border-white/10 rounded-2xl p-2.5 backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xl">
+        {/* Modules Tray */}
+        <div className="bg-[#070e24]/95 border border-white/10 rounded-2xl p-2.5 backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xl">
           
           <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
             
-            {/* PAYLOAD CATEGORY */}
+            {/* PAYLOAD MODULES */}
             {activeCategory === 'payload' && payloadOptions.map(item => {
               const isSelected = state.selectedInstrumentIds.includes(item.id);
               return (
@@ -274,7 +338,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
               );
             })}
 
-            {/* POWER CATEGORY */}
+            {/* POWER MODULES */}
             {activeCategory === 'power' && powerOptions.map(item => {
               const isSelected = state.powerSystemId === item.id;
               return (
@@ -305,7 +369,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
               );
             })}
 
-            {/* ROCKET CATEGORY */}
+            {/* ROCKET MODULES */}
             {activeCategory === 'rocket' && rocketOptions.map(item => {
               const isSelected = state.launchVehicleId === item.id;
               return (
@@ -338,7 +402,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
 
           </div>
 
-          {/* Big Glowing Launch Button on Right */}
+          {/* Big Launch Button */}
           <button
             onClick={() => {
               if (canLaunch) {
@@ -347,7 +411,7 @@ export const SimpleMissionBuilder: React.FC<Props> = ({
               }
             }}
             disabled={!canLaunch}
-            className={`w-full sm:w-auto px-6 py-3.5 rounded-xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 shrink-0 transition-all ${
+            className={`w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 shrink-0 transition-all ${
               canLaunch
                 ? 'btn-nasa-accent shadow-lg hover:scale-105 active:scale-95 cursor-pointer animate-pulse'
                 : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5'
