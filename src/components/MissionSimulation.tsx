@@ -3,7 +3,6 @@ import {
   MissionDesignState, 
   EngineeringBudgets, 
   SimulationEvent, 
-  MissionTelemetry, 
   MissionEvaluationReport 
 } from '../types/mission';
 import { NASA_SCENARIOS, NASA_ORBITS, NASA_HISTORIC_MISSIONS } from '../data/nasaData';
@@ -14,18 +13,14 @@ import {
   Rocket, 
   Play, 
   Pause, 
-  FastForward, 
   ShieldAlert, 
-  CheckCircle2, 
-  Radio, 
   Zap, 
   Database, 
   Award, 
-  AlertTriangle, 
-  Compass, 
   Flame, 
   Activity, 
-  Volume2, 
+  CheckCircle2, 
+  Radio, 
   ChevronRight,
   Sparkles
 } from 'lucide-react';
@@ -52,9 +47,7 @@ export const MissionSimulation: React.FC<Props> = ({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [simTimeSec, setSimTimeSec] = useState<number>(0);
 
-  // Live Telemetry
-  const [altitudeKm, setAltitudeKm] = useState<number>(0);
-  const [velocityKms, setVelocityKms] = useState<number>(0);
+  // Live Game Telemetry
   const [batterySoc, setBatterySoc] = useState<number>(100);
   const [scienceYield, setScienceYield] = useState<number>(0);
   const [dataBufferGb, setDataBufferGb] = useState<number>(0);
@@ -68,11 +61,11 @@ export const MissionSimulation: React.FC<Props> = ({
   const addLog = (msg: string) => {
     setTelemetryLogs(prev => [
       `[T+${Math.floor(simTimeSec)}s] ${msg}`,
-      ...prev.slice(0, 30)
+      ...prev.slice(0, 25)
     ]);
   };
 
-  // Pre-launch countdown
+  // Countdown Sequence
   useEffect(() => {
     if (phase !== 'countdown') return;
 
@@ -83,13 +76,13 @@ export const MissionSimulation: React.FC<Props> = ({
       }, 1000);
       return () => clearTimeout(timer);
     } else {
-      soundFx.playThruster(2.5);
+      soundFx.playThruster(3.0);
       setPhase('launch');
-      addLog(`LIFTOFF! Booster ignition sequence completed. ${state.launchVehicleId.toUpperCase()} clearing the pad.`);
+      addLog(`LIFTOFF! Ignition sequence start. Rocket booster clearing the launch pad.`);
     }
   }, [countdown, phase]);
 
-  // Main simulation tick
+  // Main Simulation Loop
   useEffect(() => {
     if (phase === 'countdown' || phase === 'completed' || isPaused) return;
 
@@ -97,23 +90,21 @@ export const MissionSimulation: React.FC<Props> = ({
       setSimTimeSec(prev => {
         const next = prev + simSpeed;
 
-        // Phase transitions
         if (next >= 10 && phase === 'launch') {
           setPhase('deployment');
           soundFx.playQuindarBeep('outro');
-          addLog('STAGING: Fairing jettisoned and spacecraft separated. Deploying solar wings & antenna array.');
+          addLog('STAGING: Fairing jettisoned. Solar array wings deployed and oriented toward Sun.');
         } else if (next >= 22 && phase === 'deployment') {
           setPhase('insertion');
-          soundFx.playThruster(1.5);
-          addLog(`PROPULSION BURN: Trajectory insertion burn initiated (${budgets.requiredDeltaVMs} m/s $\\Delta v$).`);
+          soundFx.playThruster(1.8);
+          addLog(`PROPULSION BURN: Trajectory insertion burn started (${budgets.requiredDeltaVMs} m/s $\\Delta v$).`);
           setFuelKg(f => Math.max(0, f - (budgets.requiredDeltaVMs > 0 ? 35 : 0)));
         } else if (next >= 35 && phase === 'insertion') {
           setPhase('operations');
           soundFx.playQuindarBeep('intro');
-          addLog(`ORBIT INSERTION CONFIRMED: Spacecraft captured into ${orbit.name}. Science operations commencing.`);
+          addLog(`ORBIT CAPTURE CONFIRMED: Spacecraft stabilized in ${orbit.name}. Primary science mission active.`);
         }
 
-        // Orbital Flight dynamics
         if (phase === 'operations') {
           // Accumulate science points
           setScienceYield(sy => {
@@ -121,49 +112,49 @@ export const MissionSimulation: React.FC<Props> = ({
             return Math.min(budgets.totalScienceScore, Math.round(sy + increment));
           });
 
-          // Data generation & Downlink pass
-          const isDownlinkPass = Math.sin(next * 0.1) > 0.3;
+          // Data link simulation
+          const isDownlink = Math.sin(next * 0.1) > 0.25;
           setDataBufferGb(buf => {
-            const generated = (budgets.dataGeneratedPerDayGb / 86400) * 100 * simSpeed;
-            const downlinked = isDownlinkPass ? (budgets.maxDownlinkCapacityPerDayGb / 86400) * 250 * simSpeed : 0;
+            const generated = (budgets.dataGeneratedPerDayGb / 86400) * 120 * simSpeed;
+            const downlinked = isDownlink ? (budgets.maxDownlinkCapacityPerDayGb / 86400) * 280 * simSpeed : 0;
             return Math.max(0, +(buf + generated - downlinked).toFixed(2));
           });
 
-          // Battery charge / discharge cycle
+          // Battery state of charge cycle
           const inShadow = Math.sin(next * 0.08) < -0.2;
           setBatterySoc(soc => {
             if (inShadow) {
-              const drain = (budgets.energyRequiredInEclipseWh / (budgets.energyRequiredInEclipseWh * 2)) * 0.4 * simSpeed;
-              return Math.max(25, +(soc - drain).toFixed(1));
+              const drain = 0.35 * simSpeed;
+              return Math.max(30, +(soc - drain).toFixed(1));
             } else {
-              const charge = 0.6 * simSpeed;
+              const charge = 0.5 * simSpeed;
               return Math.min(100, +(soc + charge).toFixed(1));
             }
           });
 
-          // In-Flight Dynamic Anomalies / Events
+          // Dynamic Anomaly 1: Solar Particle Storm
           if (next >= 45 && !eventTriggeredRef.current['event_cme'] && !currentEvent) {
             eventTriggeredRef.current['event_cme'] = true;
             soundFx.playAlarm();
             setCurrentEvent({
               id: 'event_cme',
               timeSec: next,
-              title: 'SOLAR PARTICLE STORM & CME DETECTED',
-              description: 'Space Weather Prediction Center reports an energetic X-class solar flare heading toward the orbital plane.',
+              title: 'EMERGENCY: SOLAR PARTICLE STORM DETECTED',
+              description: 'Space Weather Alert! A high-energy coronal mass ejection is impinging upon your orbit.',
               severity: 'warning',
               options: [
                 {
-                  text: 'Orient into Safe Mode & Power Down Sensitive Sensors (Protects hardware)',
+                  text: 'Orient into Safe Mode & Power Down Optics (Shields electronics)',
                   action: 'safe_mode',
                   costPowerWh: 10,
-                  logMessage: 'COMMAND: Safe mode active. Instruments shielded from cosmic rays.'
+                  logMessage: 'COMMAND: Safe mode active. Microchips shielded from ionizing radiation.'
                 },
                 {
-                  text: 'Keep Science Instruments Active (Risk sensor degradation for bonus science!)',
+                  text: 'Keep Science Instruments Active (+100 Bonus Science, Risk 10% Sensor Wear)',
                   action: 'risk_science',
-                  scienceBonus: 85,
-                  riskFactor: 12,
-                  logMessage: 'COMMAND: Instruments kept active! Captured rare solar wind magnetosphere interaction data.'
+                  scienceBonus: 100,
+                  riskFactor: 10,
+                  logMessage: 'COMMAND: Instruments kept active! Captured historic magnetic shockwave data.'
                 }
               ]
             });
@@ -173,16 +164,16 @@ export const MissionSimulation: React.FC<Props> = ({
             setCurrentEvent({
               id: 'event_plume',
               timeSec: next,
-              title: 'TRANSIENT OPPORTUNITY: CRYIC PLUME BURST',
-              description: 'Onboard navigation cameras detect a surprise active vapor eruption venting into space!',
+              title: 'SERENDIPITOUS TARGET: CRYIC PLUME VENT DETECTED',
+              description: 'Optical sensors have detected an active volatile eruption plume venting directly below your flight path!',
               severity: 'opportunity',
               options: [
                 {
-                  text: 'Execute Rapid Slew Maneuver & Sample Plume (Consumes 15 kg fuel)',
+                  text: 'Fire Reaction Control Thrusters & Skim Plume (+150 Bonus Science, Consumes 15 kg fuel)',
                   action: 'slew_sample',
                   costPropellantKg: 15,
-                  scienceBonus: 120,
-                  logMessage: 'MANEUVER: Thrusters fired to skim through plume. Mass spectrometer recorded pristine volatiles!'
+                  scienceBonus: 150,
+                  logMessage: 'MANEUVER: Thrusters fired to skim through plume. Mass spectrometer recorded organic molecules!'
                 },
                 {
                   text: 'Maintain Standard Survey Profile (Conserves propellant)',
@@ -193,7 +184,6 @@ export const MissionSimulation: React.FC<Props> = ({
             });
           }
 
-          // Complete Mission after duration
           if (next >= 120) {
             handleCompleteMission();
           }
@@ -226,18 +216,23 @@ export const MissionSimulation: React.FC<Props> = ({
     setCurrentEvent(null);
   };
 
+  const handleManualBurnBonus = () => {
+    soundFx.playThruster(1.2);
+    setScienceYield(sy => sy + 40);
+    addLog('MANUAL THRUSTER PULSE: Orbital insertion trimmed with +40 science precision bonus!');
+  };
+
   const handleCompleteMission = () => {
     setPhase('completed');
     soundFx.playSuccess();
     try {
       confetti({
-        particleCount: 120,
-        spread: 80,
+        particleCount: 140,
+        spread: 90,
         origin: { y: 0.6 }
       });
     } catch {}
 
-    // Generate comprehensive evaluation report
     const scienceRatio = scienceYield / Math.max(1, scenario.minScienceTarget);
     const massMarginScore = Math.max(0, Math.min(250, budgets.massMarginPercent * 7));
     const budgetScore = Math.max(0, Math.min(250, (budgets.remainingBudgetM / scenario.maxBudgetM) * 500));
@@ -263,7 +258,7 @@ export const MissionSimulation: React.FC<Props> = ({
     };
 
     const report: MissionEvaluationReport = {
-      missionName: state.missionName || `${scenario.title} Flight Unit 1`,
+      missionName: state.missionName || `${scenario.title} Unit-1`,
       scenarioTitle: scenario.title,
       status: overallScore >= 650 ? 'FULL_SUCCESS' : 'PARTIAL_SUCCESS',
       overallScore,
@@ -276,7 +271,7 @@ export const MissionSimulation: React.FC<Props> = ({
         'Orbital Injection & Array Deployment Certified',
         'Payload Telemetry & Science Downlink Verified',
         'Autonomous Event Anomaly Successfully Resolved',
-        'NASA MDL Concurrent Engineering Compliance Achieved'
+        'NASA Concurrent Systems Engineering Standards Met'
       ],
       postMissionDebrief: `The mission completed nominal operations in ${orbit.name}. Collected ${scienceYield} science points with ${budgets.massMarginPercent.toFixed(1)}% mass margin and $${budgets.remainingBudgetM.toFixed(1)}M in budget reserve.`,
       comparableNasaMission: historicMatch,
@@ -288,50 +283,64 @@ export const MissionSimulation: React.FC<Props> = ({
 
   return (
     <div className="space-y-6">
-      {/* 3D Celestial Orbit Simulator */}
+      
+      {/* 3D Celestial Flight Dynamics View */}
       <ThreeOrbitViewer 
         state={state} 
         simulationTimeSec={simTimeSec} 
         isSimulating={phase !== 'countdown' && !isPaused} 
       />
 
-      {/* Mission Phase Tracker & Countdown overlay */}
+      {/* Retro-Futuristic Countdown Overlay */}
       {phase === 'countdown' && (
-        <div className="p-8 rounded-2xl bg-space-950/90 border border-cyan-400 text-center shadow-glow-cyan">
-          <div className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-2">
-            KENNEDY SPACE CENTER • LAUNCH CONTROL CENTER
+        <div className="p-8 rounded-3xl bg-[#070D1F]/95 border-2 border-cyan-400 text-center shadow-[0_0_40px_rgba(0,229,255,0.3)] backdrop-blur-xl">
+          <div className="text-xs font-mono text-cyan-400 uppercase tracking-widest mb-2 flex items-center justify-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            <span>KENNEDY SPACE CENTER • LAUNCH COUNTDOWN IN PROGRESS</span>
           </div>
-          <div className="text-6xl md:text-8xl font-mono font-black text-white tracking-tighter mb-4 animate-pulse">
+          <div className="text-7xl md:text-9xl font-mono font-black text-white tracking-tighter my-3 animate-pulse">
             T-{countdown}
           </div>
           <div className="text-sm font-mono text-slate-300">
-            Flight Director Go / No-Go poll completed. Terminal countdown sequencer active.
+            Main engine fuel pressurization nominal. Terminal sequencer in control.
           </div>
         </div>
       )}
 
-      {/* Flight Control HUD Console */}
-      <div className="p-5 rounded-2xl bg-space-900/95 border border-white/10 backdrop-blur-md">
-        {/* Top Control Bar */}
+      {/* Flight Director Gaming Dashboard */}
+      <div className="p-5 rounded-3xl bg-[#091226]/95 border border-cyan-500/30 backdrop-blur-xl shadow-xl">
+        
+        {/* Cockpit Status Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
             <div>
-              <div className="text-xs font-mono font-bold text-white uppercase">
-                MISSION ELAPSED TIME (MET): <span className="text-cyan-400">{Math.floor(simTimeSec / 60)}m {simTimeSec % 60}s</span>
+              <div className="text-xs font-mono font-bold text-white uppercase flex items-center gap-2">
+                MISSION ELAPSED TIME: <span className="text-cyan-400 text-sm">{Math.floor(simTimeSec / 60)}m {simTimeSec % 60}s</span>
               </div>
               <div className="text-[11px] font-mono text-slate-400">
-                PHASE: <strong className="text-yellow-400 uppercase">{phase}</strong>
+                STAGE: <strong className="text-yellow-400 uppercase">{phase}</strong>
               </div>
             </div>
           </div>
 
-          {/* Time Warp Speed Controls */}
+          {/* Time Warp & Thruster Controls */}
           <div className="flex items-center gap-2">
+            {phase === 'operations' && (
+              <button
+                onClick={handleManualBurnBonus}
+                className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-mono text-xs font-bold transition flex items-center gap-1 shadow-md"
+                title="Pulse Thruster for Bonus Points"
+              >
+                <Flame className="w-3.5 h-3.5" />
+                <span>PULSE RCS THRUST</span>
+              </button>
+            )}
+
             <button
               onClick={() => setIsPaused(!isPaused)}
-              className="p-2 rounded-lg bg-space-800 text-slate-200 hover:bg-space-700 transition"
-              title={isPaused ? 'Resume Simulation' : 'Pause Simulation'}
+              className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition"
+              title={isPaused ? 'Resume' : 'Pause'}
             >
               {isPaused ? <Play className="w-4 h-4 text-emerald-400" /> : <Pause className="w-4 h-4 text-amber-400" />}
             </button>
@@ -342,8 +351,8 @@ export const MissionSimulation: React.FC<Props> = ({
                 onClick={() => setSimSpeed(spd)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition ${
                   simSpeed === spd
-                    ? 'bg-cyan-500 text-space-950 shadow-glow-cyan'
-                    : 'bg-space-800 text-slate-300 hover:bg-space-700'
+                    ? 'bg-cyan-500 text-space-950 shadow-[0_0_12px_rgba(0,229,255,0.4)]'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
                 {spd}x
@@ -352,24 +361,24 @@ export const MissionSimulation: React.FC<Props> = ({
 
             <button
               onClick={handleCompleteMission}
-              className="ml-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition"
+              className="ml-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold transition shadow-md"
             >
-              FINISH SIMULATION
+              FINISH MISSION
             </button>
           </div>
         </div>
 
-        {/* Real-Time Telemetry Gauges */}
+        {/* Real-Time Flight Gauges */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 my-4">
-          <div className="p-3 rounded-xl bg-space-950/70 border border-white/5 font-mono">
-            <span className="text-[10px] text-slate-500 block flex items-center gap-1">
-              <Zap className="w-3 h-3 text-yellow-400" />
-              BATTERY SOC
+          
+          <div className="p-3.5 rounded-2xl bg-[#070D1F] border border-yellow-500/30 font-mono">
+            <span className="text-[10px] text-yellow-400 block flex items-center gap-1 font-bold">
+              <Zap className="w-3 h-3 text-yellow-400" /> BATTERY SOC
             </span>
-            <div className="text-xl font-bold text-yellow-400 mt-1">
+            <div className="text-2xl font-black text-yellow-400 mt-1">
               {batterySoc}%
             </div>
-            <div className="w-full bg-space-800 h-1.5 rounded-full mt-2 overflow-hidden">
+            <div className="w-full bg-slate-900 h-1.5 rounded-full mt-2 overflow-hidden">
               <div 
                 className="h-full bg-yellow-400 transition-all duration-300"
                 style={{ width: `${batterySoc}%` }}
@@ -377,67 +386,64 @@ export const MissionSimulation: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-space-950/70 border border-white/5 font-mono">
-            <span className="text-[10px] text-slate-500 block flex items-center gap-1">
-              <Award className="w-3 h-3 text-emerald-400" />
-              SCIENCE POINTS
+          <div className="p-3.5 rounded-2xl bg-[#070D1F] border border-cyan-500/30 font-mono">
+            <span className="text-[10px] text-cyan-400 block flex items-center gap-1 font-bold">
+              <Award className="w-3 h-3 text-cyan-400" /> SCIENCE YIELD
             </span>
-            <div className="text-xl font-bold text-cyan-400 mt-1">
+            <div className="text-2xl font-black text-cyan-300 mt-1">
               {scienceYield} <span className="text-xs font-normal text-slate-500">pts</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-1">
-              Target: {scenario.minScienceTarget} pts
+            <div className="text-[10px] text-slate-400 mt-1">
+              Goal: {scenario.minScienceTarget} pts
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-space-950/70 border border-white/5 font-mono">
-            <span className="text-[10px] text-slate-500 block flex items-center gap-1">
-              <Database className="w-3 h-3 text-purple-400" />
-              DATA RECORDER
+          <div className="p-3.5 rounded-2xl bg-[#070D1F] border border-purple-500/30 font-mono">
+            <span className="text-[10px] text-purple-400 block flex items-center gap-1 font-bold">
+              <Database className="w-3 h-3 text-purple-400" /> SSR BUFFER
             </span>
-            <div className="text-xl font-bold text-white mt-1">
+            <div className="text-2xl font-black text-white mt-1">
               {dataBufferGb} <span className="text-xs font-normal text-slate-500">Gb</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-1">
-              Solid-State Buffer
+            <div className="text-[10px] text-slate-400 mt-1">
+              Solid-State Memory
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-space-950/70 border border-white/5 font-mono">
-            <span className="text-[10px] text-slate-500 block flex items-center gap-1">
-              <Flame className="w-3 h-3 text-orange-400" />
-              FUEL REMAINING
+          <div className="p-3.5 rounded-2xl bg-[#070D1F] border border-orange-500/30 font-mono">
+            <span className="text-[10px] text-orange-400 block flex items-center gap-1 font-bold">
+              <Flame className="w-3 h-3 text-orange-400" /> PROPELLANT
             </span>
-            <div className="text-xl font-bold text-orange-400 mt-1">
+            <div className="text-2xl font-black text-orange-400 mt-1">
               {fuelKg} <span className="text-xs font-normal text-slate-500">kg</span>
             </div>
-            <div className="text-[10px] text-slate-500 mt-1">
-              Propellant mass
+            <div className="text-[10px] text-slate-400 mt-1">
+              Propulsion Fuel
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-space-950/70 border border-white/5 font-mono">
-            <span className="text-[10px] text-slate-500 block flex items-center gap-1">
-              <Activity className="w-3 h-3 text-sky-400" />
-              BUS INTEGRITY
+          <div className="p-3.5 rounded-2xl bg-[#070D1F] border border-emerald-500/30 font-mono">
+            <span className="text-[10px] text-emerald-400 block flex items-center gap-1 font-bold">
+              <Activity className="w-3 h-3 text-emerald-400" /> HEALTH
             </span>
-            <div className="text-xl font-bold text-emerald-400 mt-1">
+            <div className="text-2xl font-black text-emerald-400 mt-1">
               {healthPercent}%
             </div>
-            <div className="text-[10px] text-slate-500 mt-1">
-              Subsystems Health
+            <div className="text-[10px] text-slate-400 mt-1">
+              Subsystems OK
             </div>
           </div>
+
         </div>
 
-        {/* Dynamic Anomaly Event Popup Modal / Card */}
+        {/* Dynamic Flight Anomaly Tactical Decision Card */}
         {currentEvent && (
-          <div className="my-4 p-5 rounded-2xl bg-amber-950/80 border border-amber-500/60 shadow-glow-gold animate-bounce-short">
+          <div className="my-4 p-5 rounded-3xl bg-amber-950/90 border-2 border-amber-500 shadow-[0_0_35px_rgba(245,158,11,0.35)] animate-bounce-short">
             <div className="flex items-center gap-2 text-amber-300 font-mono text-xs font-bold uppercase mb-2">
               <ShieldAlert className="w-4 h-4 text-amber-400" />
-              <span>FLIGHT DIRECTOR TACTICAL DECISION REQUIRED</span>
+              <span>FLIGHT DIRECTOR TACTICAL EMERGENCY DECISION</span>
             </div>
-            <h4 className="text-base font-bold text-white mb-1">
+            <h4 className="text-base md:text-lg font-bold text-white mb-1">
               {currentEvent.title}
             </h4>
             <p className="text-xs text-slate-300 mb-4 leading-relaxed font-mono">
@@ -449,18 +455,18 @@ export const MissionSimulation: React.FC<Props> = ({
                 <button
                   key={idx}
                   onClick={() => handleResolveEvent(idx)}
-                  className="p-3 rounded-xl bg-space-950/80 border border-white/20 hover:border-amber-400 hover:bg-space-900 text-left transition-all group"
+                  className="p-3.5 rounded-2xl bg-[#070B19]/90 border border-white/20 hover:border-amber-400 hover:bg-[#0c1630] text-left transition-all group cursor-pointer"
                 >
                   <div className="text-xs font-semibold text-white group-hover:text-amber-300 mb-1 leading-snug">
                     {opt.text}
                   </div>
                   {opt.scienceBonus && (
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold block">
-                      +{opt.scienceBonus} Bonus Science
+                    <span className="text-[11px] font-mono text-emerald-400 font-bold block">
+                      +{opt.scienceBonus} Bonus Science XP
                     </span>
                   )}
                   {opt.costPropellantKg && (
-                    <span className="text-[10px] font-mono text-orange-400 font-bold block">
+                    <span className="text-[11px] font-mono text-orange-400 font-bold block">
                       Requires {opt.costPropellantKg} kg Propellant
                     </span>
                   )}
@@ -470,13 +476,13 @@ export const MissionSimulation: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Flight Telemetry Event Stream */}
+        {/* Real-time Telemetry Log Stream */}
         <div className="mt-4 pt-3 border-t border-white/10">
           <div className="text-xs font-mono text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
             <Radio className="w-3.5 h-3.5 text-cyan-400" />
-            NASA Flight Director Telemetry Stream
+            NASA FLIGHT DIRECTOR TELEMETRY STREAM
           </div>
-          <div className="h-28 overflow-y-auto font-mono text-xs text-slate-300 space-y-1 bg-space-950/60 p-2.5 rounded-xl border border-white/5">
+          <div className="h-24 overflow-y-auto font-mono text-xs text-slate-300 space-y-1 bg-[#070D1F] p-3 rounded-xl border border-white/5">
             {telemetryLogs.map((log, idx) => (
               <div key={idx} className="leading-snug">
                 {log}
@@ -484,7 +490,9 @@ export const MissionSimulation: React.FC<Props> = ({
             ))}
           </div>
         </div>
+
       </div>
+
     </div>
   );
 };
