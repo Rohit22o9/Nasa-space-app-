@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   MissionDesignState, 
   MissionEvaluationReport 
@@ -7,8 +7,9 @@ import { NASA_SCENARIOS } from './data/nasaData';
 import { calculateEngineeringBudgets } from './utils/engineeringPhysics';
 import { soundFx } from './utils/audio';
 
-// Simplified Components
+// Components
 import { Header } from './components/Header';
+import { CosmicScrollHero } from './components/CosmicScrollHero';
 import { ScenarioSelector } from './components/ScenarioSelector';
 import { SimpleMissionBuilder } from './components/SimpleMissionBuilder';
 import { MissionSimulation } from './components/MissionSimulation';
@@ -16,12 +17,14 @@ import { PostMissionReport } from './components/PostMissionReport';
 import { TutorialModal } from './components/TutorialModal';
 
 export function App() {
-  // Step 1: Destination, Step 2: Build Spacecraft, Step 3: Launch Simulation, Step 4: Mission Results
+  // Step 1: Destination (with Cosmic Scroll Entrance), Step 2: Build Spacecraft, Step 3: Launch Simulation, Step 4: Mission Results
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isTeamMode, setIsTeamMode] = useState<boolean>(true);
   const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
   const [audioEnabled, setAudioEnabled] = useState<boolean>(true);
   const [evaluationReport, setEvaluationReport] = useState<MissionEvaluationReport | null>(null);
+
+  const missionCardsRef = useRef<HTMLDivElement>(null);
 
   // Core Mission Design State
   const [state, setState] = useState<MissionDesignState>({
@@ -61,6 +64,13 @@ export function App() {
 
   const activeScenario = NASA_SCENARIOS.find(s => s.id === state.scenarioId) || NASA_SCENARIOS[0];
 
+  // Scroll to Mission Cards smoothly
+  const handleScrollToCards = () => {
+    if (missionCardsRef.current) {
+      missionCardsRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   // Step 1 -> Step 2
   const handleSelectScenario = (scenarioId: string) => {
     const sc = NASA_SCENARIOS.find(s => s.id === scenarioId) || NASA_SCENARIOS[0];
@@ -98,16 +108,19 @@ export function App() {
       cmlStage: 2
     }));
 
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setCurrentStep(2);
   };
 
   // Step 2 -> Step 3
   const handleStartSimulation = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setCurrentStep(3);
   };
 
   // Step 3 -> Step 4
   const handleFinishMission = (report: MissionEvaluationReport) => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     setEvaluationReport(report);
     setCurrentStep(4);
   };
@@ -125,7 +138,10 @@ export function App() {
       {/* Clean NASA Header */}
       <Header
         currentStep={currentStep}
-        onStepChange={setCurrentStep}
+        onStepChange={(step) => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          setCurrentStep(step);
+        }}
         scenarioTitle={activeScenario.title}
         isTeamMode={isTeamMode}
         onToggleTeamMode={() => setIsTeamMode(!isTeamMode)}
@@ -135,45 +151,59 @@ export function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full max-w-6xl mx-auto p-4 md:p-6 pb-20">
+      <main className="flex-1 w-full">
         
-        {/* STEP 1: DESTINATION SELECTION */}
+        {/* STEP 1: COSMIC SCROLL ENTRANCE + MISSION SELECTOR */}
         {currentStep === 1 && (
-          <ScenarioSelector
-            onSelectScenario={handleSelectScenario}
-            selectedId={state.scenarioId}
-            isTeamMode={isTeamMode}
-          />
+          <div className="space-y-4">
+            {/* 3D Deep Space Scroll Zoom Entrance */}
+            <CosmicScrollHero onEnterLab={handleScrollToCards} />
+
+            {/* Mission Cards Docking Target */}
+            <div ref={missionCardsRef} className="max-w-6xl mx-auto px-4 md:px-6 pt-12 pb-20">
+              <ScenarioSelector
+                onSelectScenario={handleSelectScenario}
+                selectedId={state.scenarioId}
+                isTeamMode={isTeamMode}
+              />
+            </div>
+          </div>
         )}
 
-        {/* STEP 2: BUILD SPACECRAFT (SIMPLIFIED) */}
+        {/* STEP 2: BUILD SPACECRAFT (SIMPLIFIED & CLEAN) */}
         {currentStep === 2 && (
-          <SimpleMissionBuilder
-            state={state}
-            setState={setState}
-            budgets={budgets}
-            onLaunch={handleStartSimulation}
-            isTeamMode={isTeamMode}
-          />
+          <div className="max-w-6xl mx-auto p-4 md:p-6 pb-20">
+            <SimpleMissionBuilder
+              state={state}
+              setState={setState}
+              budgets={budgets}
+              onLaunch={handleStartSimulation}
+              isTeamMode={isTeamMode}
+            />
+          </div>
         )}
 
         {/* STEP 3: FLIGHT SIMULATION & ORBIT */}
         {currentStep === 3 && (
-          <MissionSimulation
-            state={state}
-            budgets={budgets}
-            onFinishMission={handleFinishMission}
-            onAbortSimulation={() => setCurrentStep(2)}
-          />
+          <div className="max-w-6xl mx-auto p-4 md:p-6 pb-20">
+            <MissionSimulation
+              state={state}
+              budgets={budgets}
+              onFinishMission={handleFinishMission}
+              onAbortSimulation={() => setCurrentStep(2)}
+            />
+          </div>
         )}
 
         {/* STEP 4: MISSION RESULTS & NASA EVALUATION */}
         {currentStep === 4 && evaluationReport && (
-          <PostMissionReport
-            report={evaluationReport}
-            onRedesign={() => setCurrentStep(2)}
-            onNewScenario={() => setCurrentStep(1)}
-          />
+          <div className="max-w-6xl mx-auto p-4 md:p-6 pb-20">
+            <PostMissionReport
+              report={evaluationReport}
+              onRedesign={() => setCurrentStep(2)}
+              onNewScenario={() => setCurrentStep(1)}
+            />
+          </div>
         )}
 
       </main>
