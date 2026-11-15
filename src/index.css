@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #030712;
+    color: #f1f5f9;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+/* Custom NASA Mission Control Grid & HUD styling */
+.hud-grid {
+  background-image: 
+    linear-gradient(to right, rgba(0, 229, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.radar-sweep {
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(0, 229, 255, 0.15) 60deg, transparent 61deg);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #070d1d;
+}
+::-webkit-scrollbar-thumb {
+  background: #1b2d56;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00e5ff;
+}
+
+/* Glassmorphism panel */
+.glass-panel {
+  background: rgba(11, 20, 42, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 229, 255, 0.18);
+}
+
+.glass-panel-subtle {
+  background: rgba(7, 13, 29, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glow-border-cyan {
+  border-color: #00e5ff;
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.25);
+}
+
+.glow-border-gold {
+  border-color: #f59e0b;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.25);
+}
+
+.glow-border-red {
+  border-color: #fc3d21;
+  box-shadow: 0 0 15px rgba(252, 61, 33, 0.25);
+}
